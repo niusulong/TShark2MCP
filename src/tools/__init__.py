@@ -403,14 +403,16 @@ async def extract_stream(pcap_file: str, src_ip: str, src_port: str,
     try:
         executor = TSHARK_EXECUTOR  # 使用全局实例
         
-        # 构建流过滤器 - 使用tcp.stream或udp.stream等
+        # 构建流过滤器 - 使用正确的TShark字段名
         if protocol.lower() in ['tcp', 'udp']:
-            # 尝试使用流ID（如果知道流ID的话）或地址端口对
-            stream_filter = f"{protocol.lower()}.src == {src_ip} and {protocol.lower()}.srcport == {src_port} and " \
-                           f"{protocol.lower()}.dst == {dst_ip} and {protocol.lower()}.dstport == {dst_port}"
+            # 使用正确的字段名：ip.src/ip.dst 和 tcp.srcport/tcp.dstport
+            # 注意：IP地址不需要引号
+            stream_filter = f'ip.src == {src_ip} and {protocol.lower()}.srcport == {src_port} and ' \
+                           f'ip.dst == {dst_ip} and {protocol.lower()}.dstport == {dst_port}'
         else:
             # 对于其他协议，使用地址匹配
-            stream_filter = f"ip.src == {src_ip} and ip.dst == {dst_ip}"
+            # 注意：IP地址不需要引号
+            stream_filter = f'ip.src == {src_ip} and ip.dst == {dst_ip}'
         
         # 如果提供了时间参数，组合过滤
         if start_time and end_time:
@@ -427,7 +429,6 @@ async def extract_stream(pcap_file: str, src_ip: str, src_port: str,
         
     except Exception as e:
         raise ToolError(f"提取网络流失败: {str(e)}")
-
 
 
 
