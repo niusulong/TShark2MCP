@@ -36,19 +36,23 @@ def _generate_cache_key(tool_name: str, **kwargs) -> str:
     return json.dumps(key_data, sort_keys=True, default=str)
 
 
-# 全局TShark执行器实例，优先使用环境变量，然后是本地路径
+# 全局TShark执行器实例，优先使用环境变量，然后是常见安装路径
 _global_tshark_path = os.environ.get('TSHARK_PATH', 'tshark')
 if _global_tshark_path == 'tshark':
-    # 如果使用默认值，尝试查找本地TShark
-    # 计算路径：__file__ -> tools -> src -> TShark2MCP -> wireshark_mcp (父目录) -> Wireshark -> tshark.exe
-    tools_dir = os.path.dirname(os.path.abspath(__file__))          # .../tools
-    src_dir = os.path.dirname(tools_dir)                           # .../src
-    tshark2mcp_dir = os.path.dirname(src_dir)                      # .../TShark2MCP
-    project_parent_dir = os.path.dirname(tshark2mcp_dir)           # .../wireshark_mcp (父目录)
-    local_tshark_path = os.path.join(project_parent_dir, 'Wireshark', 'tshark.exe')
-    print(f"DEBUG: 尝试本地TShark路径: {local_tshark_path}", file=sys.stderr)  # 调试输出
-    if os.path.exists(local_tshark_path):
-        _global_tshark_path = local_tshark_path
+    # 尝试常见的Wireshark安装路径
+    common_paths = [
+        r"C:\Program Files\Wireshark\tshark.exe",
+        r"C:\Program Files (x86)\Wireshark\tshark.exe"
+    ]
+    
+    # 检查常见路径
+    for path in common_paths:
+        if os.path.exists(path):
+            _global_tshark_path = path
+            print(f"DEBUG: 找到TShark路径: {path}", file=sys.stderr)
+            break
+    
+    
 
 TSHARK_EXECUTOR = TSharkExecutor(_global_tshark_path)
 
@@ -443,19 +447,19 @@ async def get_statistics(pcap_file: str, metric: str = "all",
     
     Args:
         pcap_file: pcap文件路径
-        metric: 统计指标类型
+        metric: 统计指标类型 ("all", "latency", "throughput", "retransmission", "tcp", "packet_loss")
         start_time: 可选，开始时间（格式如 "14:00:00" 或 "2023-01-01 14:00:00"）
         end_time: 可选，结束时间（格式如 "14:10:00" 或 "2023-01-01 14:10:00"）
     
     Returns:
         统计指标结果
     """
-    if not validate_pcap_file(pcap_file):
-        raise ToolError(f"文件不存在或无效: {pcap_file}")
-    
     # 验证时间参数：要么都提供，要么都不提供
     if (start_time is None) != (end_time is None):
         raise ToolError("start_time 和 end_time 必须同时提供或同时为空")
+    
+    if not validate_pcap_file(pcap_file):
+        raise ToolError(f"文件不存在或无效: {pcap_file}")
     
     cache_key = _generate_cache_key('get_statistics', pcap_file=pcap_file, 
                                     metric=metric, start_time=start_time, end_time=end_time)
@@ -465,85 +469,85 @@ async def get_statistics(pcap_file: str, metric: str = "all",
     
     try:
         import subprocess
+        import tempfile
+        import re
         
         executor = TSHARK_EXECUTOR  # 使用全局实例
         stats = {}
         
-        # 构建时间过滤器（如果提供了时间参数）
-        time_filter_args = []
+        # 构建时间过滤器
+        time_filter = None
         if start_time and end_time:
-            # 对于统计命令，使用 -a (autostop) 和 -Y 组合来限制时间范围
-            # 注意：TShark的统计命令(-z)与显示过滤器(-Y)的组合使用有限制
-            # 这里先提取时间范围内的包，再进行统计
-            time_filtered_file = None
-            try:
+            time_filter = f'frame.time >= "{start_time}" && frame.time <= "{end_time}"'
+        
+        # 创建临时文件用于时间过滤（如果需要）
+        temp_file = None
+        try:
+            if time_filter:
                 # 创建临时文件存储时间过滤后的包
-                import tempfile
                 with tempfile.NamedTemporaryFile(suffix='.pcap', delete=False) as tmp_file:
-                    time_filtered_file = tmp_file.name
+                    temp_file = tmp_file.name
                 
-                # 先提取时间范围内的包
-                time_filter = f'frame.time >= "{start_time}" && frame.time <= "{end_time}"'
+                # 导出时间范围内的包
                 export_cmd = [
                     executor.tshark_path,
                     "-r", pcap_file,
                     "-Y", time_filter,
-                    "-w", time_filtered_file
+                    "-w", temp_file
                 ]
                 export_result = subprocess.run(export_cmd, capture_output=True, text=True, timeout=30)
                 
                 if export_result.returncode != 0:
                     raise ToolError(f"时间过滤失败: {export_result.stderr}")
                 
-                # 使用过滤后的文件进行统计
-                stats_file = time_filtered_file
-            finally:
-                # 清理临时文件
-                if time_filtered_file and os.path.exists(time_filtered_file):
-                    os.unlink(time_filtered_file)
-        else:
-            stats_file = pcap_file
-        
-        if metric == "all" or metric == "tcp":
-            # 获取TCP统计
-            cmd = [
-                executor.tshark_path,
-                "-r", stats_file,
-                "-q",
-                "-z", "tcp,stat"
-            ]
-            result = subprocess.run(cmd, capture_output=True, text=True, timeout=30)
-            if result.returncode == 0:
-                stats['tcp_stats'] = result.stdout
-        
-        if metric == "all" or metric == "throughput":
-            # 获取吞吐量统计
-            cmd = [
-                executor.tshark_path,
-                "-r", stats_file,
-                "-q",
-                "-z", "io,stat", "1"
-            ]
-            result = subprocess.run(cmd, capture_output=True, text=True, timeout=30)
-            if result.returncode == 0:
-                stats['throughput'] = result.stdout
-        
-        # 提取基本统计信息
-        if start_time and end_time:
-            time_filter = f'frame.time >= "{start_time}" && frame.time <= "{end_time}"'
-            all_packets = executor.execute(pcap_file, display_filter=time_filter)
-        else:
-            all_packets = executor.execute(pcap_file)
-        
-        stats['total_packets'] = len(all_packets)
-        stats['file_size_bytes'] = Path(pcap_file).stat().st_size
-        
-        # 添加时间范围信息
-        if start_time and end_time:
-            stats['time_range'] = {
-                'start': start_time,
-                'end': end_time
+                stats_file = temp_file
+            else:
+                stats_file = pcap_file
+            
+            # 根据metric参数执行不同的统计
+            if metric == "all" or metric == "latency":
+                # 延迟统计 - 使用TCP流分析
+                stats['latency'] = await _calculate_latency_stats(executor, stats_file)
+            
+            if metric == "all" or metric == "throughput":
+                # 吞吐量统计
+                stats['throughput'] = await _calculate_throughput_stats(executor, stats_file)
+            
+            if metric == "all" or metric == "retransmission":
+                # 重传统计
+                stats['retransmission'] = await _calculate_retransmission_stats(executor, stats_file)
+            
+            if metric == "all" or metric == "tcp":
+                # TCP连接统计
+                stats['tcp_connections'] = await _calculate_tcp_connection_stats(executor, stats_file)
+            
+            if metric == "all" or metric == "packet_loss":
+                # 丢包统计
+                stats['packet_loss'] = await _calculate_packet_loss_stats(executor, stats_file)
+            
+            # 基本统计信息
+            if time_filter:
+                all_packets = executor.execute(pcap_file, display_filter=time_filter)
+            else:
+                all_packets = executor.execute(pcap_file)
+            
+            stats['basic'] = {
+                'total_packets': len(all_packets),
+                'file_size_bytes': Path(pcap_file).stat().st_size,
+                'capture_duration': await _calculate_capture_duration(executor, stats_file)
             }
+            
+            # 添加时间范围信息
+            if start_time and end_time:
+                stats['time_range'] = {
+                    'start': start_time,
+                    'end': end_time
+                }
+            
+        finally:
+            # 清理临时文件
+            if temp_file and os.path.exists(temp_file):
+                os.unlink(temp_file)
         
         # 缓存结果
         global_cache.set(cache_key, stats)
@@ -551,6 +555,406 @@ async def get_statistics(pcap_file: str, metric: str = "all",
         
     except Exception as e:
         raise ToolError(f"获取统计信息失败: {str(e)}")
+
+
+async def _calculate_latency_stats(executor, pcap_file) -> Dict[str, Any]:
+    """计算延迟统计"""
+    try:
+        import subprocess
+        
+        latency_stats = {}
+        
+        # 尝试获取TCP流统计，包含RTT信息
+        cmd_tcp = [
+            executor.tshark_path,
+            "-r", pcap_file,
+            "-q",
+            "-z", "conv,tcp"
+        ]
+        result_tcp = subprocess.run(cmd_tcp, capture_output=True, text=True, timeout=30)
+        
+        if result_tcp.returncode == 0:
+            # 解析TCP会话统计，获取基本的TCP信息
+            output = result_tcp.stdout
+            lines = output.split('\n')
+            
+            # 查找TCP流信息 - 使用正则表达式解析
+            tcp_streams = []
+            import re
+            
+            # 正则表达式匹配TCP会话行
+            # 格式如: 10.206.134.192:25520 <-> 120.86.64.161:10020 85 8326 bytes 108 6958 bytes
+            stream_pattern = r'(\d+\.\d+\.\d+\.\d+:\d+)\s+<->\s+(\d+\.\d+\.\d+\.\d+:\d+)\s+(\d+)\s+(\d+)\s+bytes\s+(\d+)\s+(\d+)\s+bytes'
+            
+            for line in lines:
+                match = re.search(stream_pattern, line)
+                if match:
+                    try:
+                        src_packets = int(match.group(3))
+                        src_bytes = int(match.group(4))
+                        dst_packets = int(match.group(5))
+                        dst_bytes = int(match.group(6))
+                        
+                        tcp_streams.append({
+                            'src': match.group(1),
+                            'dst': match.group(2),
+                            'packets': src_packets + dst_packets,
+                            'bytes': src_bytes + dst_bytes
+                        })
+                    except (ValueError, IndexError):
+                        continue
+            
+            if tcp_streams:
+                total_packets = sum(s['packets'] for s in tcp_streams)
+                total_bytes = sum(s['bytes'] for s in tcp_streams)
+                latency_stats['tcp_streams'] = {
+                    'total_streams': len(tcp_streams),
+                    'total_packets': total_packets,
+                    'total_bytes': total_bytes,
+                    'avg_packets_per_stream': total_packets / len(tcp_streams),
+                    'avg_bytes_per_stream': total_bytes / len(tcp_streams),
+                    'streams': tcp_streams[:5]  # 返回前5个流的详细信息
+                }
+            
+            # 如果没有解析到数据，至少记录原始输出的一部分
+            if not tcp_streams:
+                latency_stats['parse_error'] = '无法解析TCP流数据'
+                latency_stats['raw_output_sample'] = output[:500] + "..." if len(output) > 500 else output
+        
+        # 获取HTTP响应时间
+        cmd_http = [
+            executor.tshark_path,
+            "-r", pcap_file,
+            "-Y", "http.request && http.response_in",
+            "-T", "fields",
+            "-e", "http.time",
+            "-E", "separator=,"
+        ]
+        result_http = subprocess.run(cmd_http, capture_output=True, text=True, timeout=30)
+        
+        if result_http.returncode == 0:
+            http_times = []
+            for line in result_http.stdout.strip().split('\n'):
+                if line.strip():
+                    try:
+                        http_times.append(float(line.strip()))
+                    except ValueError:
+                        continue
+            
+            if http_times:
+                latency_stats['http_response'] = {
+                    'average_ms': sum(http_times) / len(http_times),
+                    'min_ms': min(http_times),
+                    'max_ms': max(http_times),
+                    'count': len(http_times)
+                }
+        
+        return latency_stats
+        
+    except Exception as e:
+        return {"error": f"延迟统计失败: {str(e)}"}
+
+
+async def _calculate_throughput_stats(executor, pcap_file) -> Dict[str, Any]:
+    """计算吞吐量统计"""
+    try:
+        import subprocess
+        import re
+        
+        # 获取I/O统计 - 使用简单格式
+        cmd = [
+            executor.tshark_path,
+            "-r", pcap_file,
+            "-q",
+            "-z", "io,phs"
+        ]
+        result = subprocess.run(cmd, capture_output=True, text=True, timeout=30)
+        
+        throughput_stats = {}
+        
+        if result.returncode == 0:
+            output = result.stdout
+            lines = output.split('\n')
+            
+            # 解析协议层次统计
+            protocol_stats = {}
+            total_frames = 0
+            total_bytes = 0
+            
+            # 正则表达式匹配协议统计行
+            # 格式如: frame frames:11221 bytes:1656881
+            protocol_pattern = r'^(\s*\w+)\s+frames:(\d+)\s+bytes:(\d+)'
+            
+            for line in lines:
+                match = re.search(protocol_pattern, line)
+                if match:
+                    protocol = match.group(1).strip()
+                    frames = int(match.group(2))
+                    bytes_data = int(match.group(3))
+                    
+                    protocol_stats[protocol] = {
+                        'frames': frames,
+                        'bytes': bytes_data
+                    }
+                    
+                    # 累计总数
+                    total_frames += frames
+                    total_bytes += bytes_data
+            
+            # 获取捕获持续时间
+            duration = 1.0  # 默认1秒
+            try:
+                # 尝试从文件获取实际持续时间
+                cmd_duration = [
+                    executor.tshark_path,
+                    "-r", pcap_file,
+                    "-T", "fields",
+                    "-e", "frame.time_relative",
+                    "-2"  # 只获取最后一个包的时间
+                ]
+                result_duration = subprocess.run(cmd_duration, capture_output=True, text=True, timeout=10)
+                if result_duration.returncode == 0 and result_duration.stdout.strip():
+                    duration = float(result_duration.stdout.strip().split('\n')[-1])
+            except:
+                pass
+            
+            if total_frames > 0 and duration > 0:
+                avg_frames_per_sec = total_frames / duration
+                avg_bytes_per_sec = total_bytes / duration
+                
+                throughput_stats = {
+                    'total_frames': total_frames,
+                    'total_bytes': total_bytes,
+                    'capture_duration_seconds': duration,
+                    'average_frames_per_second': avg_frames_per_sec,
+                    'average_bytes_per_second': avg_bytes_per_sec,
+                    'average_bps': avg_bytes_per_sec * 8,  # 转换为bps
+                    'protocol_distribution': protocol_stats
+                }
+        
+        return throughput_stats
+        
+    except Exception as e:
+        return {"error": f"吞吐量统计失败: {str(e)}"}
+
+
+async def _calculate_retransmission_stats(executor, pcap_file) -> Dict[str, Any]:
+    """计算重传统计"""
+    try:
+        import subprocess
+        
+        # 获取TCP重传统计
+        cmd = [
+            executor.tshark_path,
+            "-r", pcap_file,
+            "-Y", "tcp.analysis.retransmission",
+            "-T", "fields",
+            "-e", "frame.number",
+            "-e", "ip.src",
+            "-e", "tcp.srcport",
+            "-e", "ip.dst",
+            "-e", "tcp.dstport",
+            "-E", "separator=,"
+        ]
+        result = subprocess.run(cmd, capture_output=True, text=True, timeout=30)
+        
+        retransmission_stats = {}
+        
+        if result.returncode == 0:
+            retransmissions = []
+            for line in result.stdout.strip().split('\n'):
+                if line.strip():
+                    parts = [p.strip() for p in line.split(',')]
+                    if len(parts) >= 5:
+                        retransmissions.append({
+                            'frame': parts[0],
+                            'src_ip': parts[1],
+                            'src_port': parts[2],
+                            'dst_ip': parts[3],
+                            'dst_port': parts[4]
+                        })
+            
+            # 获取总TCP包数
+            cmd_total = [
+                executor.tshark_path,
+                "-r", pcap_file,
+                "-Y", "tcp",
+                "-T", "fields",
+                "-e", "frame.number"
+            ]
+            result_total = subprocess.run(cmd_total, capture_output=True, text=True, timeout=30)
+            
+            total_tcp_packets = 0
+            if result_total.returncode == 0:
+                total_tcp_packets = len([line for line in result_total.stdout.strip().split('\n') if line.strip()])
+            
+            if total_tcp_packets > 0:
+                retransmission_rate = (len(retransmissions) / total_tcp_packets) * 100
+                retransmission_stats = {
+                    'retransmission_count': len(retransmissions),
+                    'total_tcp_packets': total_tcp_packets,
+                    'retransmission_rate_percent': round(retransmission_rate, 2),
+                    'retransmissions': retransmissions[:10]  # 只返回前10个重传包的详细信息
+                }
+        
+        return retransmission_stats
+        
+    except Exception as e:
+        return {"error": f"重传统计失败: {str(e)}"}
+
+
+async def _calculate_tcp_connection_stats(executor, pcap_file) -> Dict[str, Any]:
+    """计算TCP连接统计"""
+    try:
+        import subprocess
+        
+        # 获取TCP流统计
+        cmd = [
+            executor.tshark_path,
+            "-r", pcap_file,
+            "-q",
+            "-z", "conv,tcp"
+        ]
+        result = subprocess.run(cmd, capture_output=True, text=True, timeout=30)
+        
+        tcp_stats = {}
+        
+        if result.returncode == 0:
+            output = result.stdout
+            connections = []
+            
+            lines = output.split('\n')
+            data_started = False
+            for line in lines:
+                if 'Src Address' in line and 'Port' in line:
+                    data_started = True
+                    continue
+                
+                if not data_started:
+                    continue
+                    
+                if line and '|' in line:
+                    parts = [p.strip() for p in line.split('|') if p.strip()]
+                    if len(parts) >= 8:
+                        try:
+                            conn = {
+                                'src_ip': parts[0],
+                                'src_port': parts[1],
+                                'dst_ip': parts[2],
+                                'dst_port': parts[3],
+                                'packets': int(parts[4]) + int(parts[5]),
+                                'bytes': int(parts[6]) + int(parts[7]),
+                                'duration': parts[8] if len(parts) > 8 else 'N/A'
+                            }
+                            connections.append(conn)
+                        except (ValueError, IndexError):
+                            continue
+            
+            if connections:
+                total_connections = len(connections)
+                total_packets = sum(conn['packets'] for conn in connections)
+                total_bytes = sum(conn['bytes'] for conn in connections)
+                
+                tcp_stats = {
+                    'total_connections': total_connections,
+                    'total_packets': total_packets,
+                    'total_bytes': total_bytes,
+                    'average_packets_per_connection': total_packets / total_connections,
+                    'average_bytes_per_connection': total_bytes / total_connections,
+                    'connections': connections[:20]  # 返回前20个连接的详细信息
+                }
+        
+        return tcp_stats
+        
+    except Exception as e:
+        return {"error": f"TCP连接统计失败: {str(e)}"}
+
+
+async def _calculate_packet_loss_stats(executor, pcap_file) -> Dict[str, Any]:
+    """计算丢包统计"""
+    try:
+        import subprocess
+        
+        # 获取丢包相关事件
+        cmd = [
+            executor.tshark_path,
+            "-r", pcap_file,
+            "-Y", "tcp.analysis.duplicate_ack || tcp.analysis.fast_retransmission || tcp.analysis.out_of_order",
+            "-T", "fields",
+            "-e", "frame.number",
+            "-e", "_ws.col.Info",
+            "-E", "separator=|"
+        ]
+        result = subprocess.run(cmd, capture_output=True, text=True, timeout=30)
+        
+        packet_loss_stats = {}
+        
+        if result.returncode == 0:
+            events = []
+            for line in result.stdout.strip().split('\n'):
+                if line.strip():
+                    parts = line.split('|')
+                    if len(parts) >= 2:
+                        events.append({
+                            'frame': parts[0],
+                            'info': parts[1]
+                        })
+            
+            # 统计不同类型的丢包事件
+            duplicate_acks = [e for e in events if 'Duplicate ACK' in e['info']]
+            fast_retrans = [e for e in events if 'Fast retransmission' in e['info']]
+            out_of_order = [e for e in events if 'Out-of-Order' in e['info']]
+            
+            packet_loss_stats = {
+                'total_loss_events': len(events),
+                'duplicate_acks': len(duplicate_acks),
+                'fast_retransmissions': len(fast_retrans),
+                'out_of_order_packets': len(out_of_order),
+                'events': events[:10]  # 返回前10个事件的详细信息
+            }
+        
+        return packet_loss_stats
+        
+    except Exception as e:
+        return {"error": f"丢包统计失败: {str(e)}"}
+
+
+async def _calculate_capture_duration(executor, pcap_file) -> Dict[str, Any]:
+    """计算捕获持续时间"""
+    try:
+        import subprocess
+        
+        # 获取第一个和最后一个包的时间
+        cmd = [
+            executor.tshark_path,
+            "-r", pcap_file,
+            "-T", "fields",
+            "-e", "frame.time_relative",
+            "-E", "separator=,"
+        ]
+        result = subprocess.run(cmd, capture_output=True, text=True, timeout=30)
+        
+        if result.returncode == 0:
+            times = []
+            for line in result.stdout.strip().split('\n'):
+                if line.strip():
+                    try:
+                        times.append(float(line.strip()))
+                    except ValueError:
+                        continue
+            
+            if times:
+                return {
+                    'start_time_seconds': 0.0,
+                    'end_time_seconds': max(times),
+                    'duration_seconds': max(times),
+                    'total_frames': len(times)
+                }
+        
+        return {"error": "无法计算捕获持续时间"}
+        
+    except Exception as e:
+        return {"error": f"持续时间计算失败: {str(e)}"}
 
 
 # 导出工具函数
