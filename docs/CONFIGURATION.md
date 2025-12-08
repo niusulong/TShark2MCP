@@ -14,7 +14,7 @@
       ],
       "env": {
         "PYTHONPATH": "D:\\niusulong\\wireshark_mcp\\TShark2MCP\\src",
-        "TSHARK_PATH": "D:\\niusulong\\wireshark_mcp\\Wireshark\\tshark.exe"
+        "TSHARK_PATH": "C:\\Program Files\\Wireshark\\tshark.exe"
       }
     }
   }
@@ -36,7 +36,7 @@
 ## 环境要求
 
 - Python 3.8+
-- TShark 4.0+ （已包含在项目 Wireshark 目录中）
+- TShark 4.0+
 - 项目依赖：`pip install -r requirements.txt`
 
 ## 使用说明
@@ -48,7 +48,17 @@
    - get_pcap_overview: 获取 pcap 文件概览
    - list_conversations: 列出网络会话
    - extract_by_time: 按时间范围提取报文
-   - extract_by_protocol: 按协议类型提取报文
+   - extract_by_protocol: 按协议类型提取报文（支持 TShark 识别的所有协议）
    - extract_stream: 提取特定网络流
-   - compare_streams: 比较两个网络流
    - get_statistics: 获取统计信息
+
+## 协议支持
+
+TShark2MCP 通过 TShark 的原生协议过滤器支持广泛的协议类型，包括但不限于：
+
+- **传输层**: TCP, UDP, SCTP
+- **网络层**: IPv4, IPv6, ICMP, ARP
+- **安全协议**: TLS/SSL, DTLS
+- **应用层**: MQTT, HTTP/HTTPS, FTP, SSH, DNS, DHCP, SMTP, Modbus, BACnet 等
+
+extract_by_protocol 工具直接将协议名传递给 TShark，因此支持 TShark 识别的任何协议，无需代码修改即可支持新协议。

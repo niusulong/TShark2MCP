@@ -30,7 +30,7 @@
 - **用途**：按协议类型提取报文，支持时间范围过滤
 - **触发场景**：需要集中分析某类协议，或用户要求只分析特定协议
 - **参数**：
-  - protocol: 协议名称（如 "tcp", "http", "mqtt", "https", "ftp", "udp", "dns", "coap"）
+  - protocol: 协议名称（支持 TShark 识别的所有协议，如 "tcp", "http", "mqtt", "https", "ftp", "udp", "dns", "coap", "tls", "ssh", "dhcp", "modbus", "bacnet" 等）
   - start_time: 可选，开始时间（格式如 "14:00:00" 或 "2023-01-01 14:00:00"）
   - end_time: 可选，结束时间（格式如 "14:10:00" 或 "2023-01-01 14:10:00"）
 - **返回内容**：仅包含指定协议的报文数据
@@ -148,18 +148,37 @@
 
 ## 支持的协议分析范围
 
-### 必须支持的协议分析：
-- **TCP**：连接建立、重传、RST、窗口、拥塞控制等分析
-- **TLS/SSL**：握手过程、证书验证、协议版本、加密套件
-- **MQTT**：CONNECT、PUBLISH、SUBSCRIBE、Keep-alive、遗嘱消息
-- **HTTP/HTTPS**：请求方法、状态码、Header、内容传输
-- **FTP**：主动/被动模式、控制连接、数据连接、传输中断
-- **UDP**：基础分析、丢包检测（基于应用层协议）
-- **CoAP**：适用于物联网受限设备场景
-- **DNS**：域名解析异常分析
+### 协议支持机制
+TShark2MCP 通过 TShark 的原生协议过滤器实现协议支持，理论上支持 TShark 识别的所有协议类型。extract_by_protocol 工具直接将协议名称传递给 TShark 的 -Y 参数，具备极强的扩展性。
 
-### 可选支持的协议分析：
-- **DHCP**：IP地址分配问题
+### 核心支持协议分析：
+- **传输层协议**：TCP、UDP、SCTP
+  - TCP：连接建立、重传、RST、窗口、拥塞控制等分析
+  - UDP：基础分析、丢包检测（基于应用层协议）
+- **网络层协议**：IPv4、IPv6、ICMP、ARP
+- **安全协议**：TLS/SSL、DTLS
+  - TLS/SSL：握手过程、证书验证、协议版本、加密套件
+- **应用层协议**：
+  - **物联网协议**：MQTT、CoAP、LoRaWAN
+    - MQTT：CONNECT、PUBLISH、SUBSCRIBE、Keep-alive、遗嘱消息
+    - CoAP：适用于物联网受限设备场景
+  - **Web服务协议**：HTTP/HTTPS、WebSocket、RESTful API
+    - HTTP/HTTPS：请求方法、状态码、Header、内容传输
+  - **文件传输协议**：FTP、SFTP、TFTP
+    - FTP：主动/被动模式、控制连接、数据连接、传输中断
+  - **邮件协议**：SMTP、POP3、IMAP
+  - **远程访问协议**：SSH、Telnet、RDP
+  - **数据库协议**：MySQL、PostgreSQL、Redis
+  - **服务发现协议**：DNS、DHCP、mDNS
+    - DNS：域名解析异常分析
+    - DHCP：IP地址分配问题
+  - **工业协议**：Modbus、BACnet、DNP3、OPC-UA
+  - **其他协议**：SNMP、NTP、Syslog、LDAP
+
+### 扩展性特点
+- 新协议支持无需修改代码，依赖 TShark 版本更新
+- 支持自定义协议过滤器组合
+- 支持协议解码器覆盖（-d 参数）
 
 ## 核心原则
 
