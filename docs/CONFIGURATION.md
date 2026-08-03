@@ -1,19 +1,32 @@
 # TShark2MCP 配置说明
 
-## MCP 服务器配置
+## 环境要求
 
-要将 TShark2MCP 集成到支持 MCP 协议的 AI 助手（如 Cursor、VS Code 等）中，需要在设置中添加以下配置：
+- **Python ≥ 3.10**
+- **Wireshark ≥ 4.0**（提供 `tshark` 和 `capinfos`）
+
+## 安装
+
+```bash
+cd TShark2MCP
+python -m venv .venv
+.venv\Scripts\activate                 # Windows；Unix 用 source .venv/bin/activate
+pip install -e ".[dev]"
+```
+
+editable install 会注册 `tshark-mcp` 命令，并让 `tshark_mcp` 包可被 import。
+
+## MCP 客户端配置
+
+将以下配置添加到支持 MCP 协议的 AI 助手（Claude Desktop / Cursor / VS Code）：
 
 ```json
 {
   "mcpServers": {
-    "tshark2mcp": {
-      "command": "python",
-      "args": [
-        "D:\\niusulong\\wireshark_mcp\\TShark2MCP\\main.py"
-      ],
+    "tshark": {
+      "command": "D:\\<path>\\TShark2MCP\\.venv\\Scripts\\python.exe",
+      "args": ["-m", "tshark_mcp"],
       "env": {
-        "PYTHONPATH": "D:\\niusulong\\wireshark_mcp\\TShark2MCP\\src",
         "TSHARK_PATH": "C:\\Program Files\\Wireshark\\tshark.exe"
       }
     }
@@ -21,44 +34,48 @@
 }
 ```
 
-**注意**：
-- TShark2MCP 已内置 TShark 路径自动检测功能，如果未设置 `TSHARK_PATH` 环境变量，会自动尝试使用项目内置的 Wireshark 目录中的 tshark.exe
-- 建议显式设置 `TSHARK_PATH` 以确保稳定性
+### 字段说明
 
-## 配置说明
+- `command`：项目 venv 的 python（editable install 后才能 `import tshark_mcp`）
+- `args`：`-m tshark_mcp` 启动 server；也可改用 console script `tshark-mcp`
+- `env.TSHARK_PATH`：可选。未设置时按优先级查找：`TSHARK_PATH` → 常见 Windows 安装目录 → 系统 PATH
 
-- `command`: 启动服务器的命令（python）
-- `args`: 命令行参数（使用绝对路径的main.py是服务器入口）
-- `env`: 环境变量
-  - `PYTHONPATH`: 确保Python能找到项目模块
-  - `TSHARK_PATH`: 指定TShark可执行文件路径
+> **不再需要 `PYTHONPATH`** —— 包已通过 `pip install -e .` 安装。
 
-## 环境要求
+## tshark 路径查找优先级
 
-- Python 3.8+
-- TShark 4.0+
-- 项目依赖：`pip install -r requirements.txt`
+`config.resolve_tshark_paths()` 级联查找：
 
-## 使用说明
+1. 环境变量 `TSHARK_PATH`（可指向 tshark 可执行文件，或 Wireshark 安装目录）
+2. 常见 Windows 路径（`C:\Program Files\Wireshark\`、`C:\Program Files (x86)\Wireshark\`）
+3. 系统 PATH（`tshark` / `capinfos`）
 
-1. 确保 TShark 已正确安装或使用项目内置版本
-2. 在项目根目录运行 `pip install -r requirements.txt`
-3. 将配置添加到 AI 助手的设置中
-4. AI 助手将能够自动发现并调用以下工具：
-   - get_pcap_overview: 获取 pcap 文件概览
-   - list_conversations: 列出网络会话
-   - extract_by_time: 按时间范围提取报文
-   - extract_by_protocol: 按协议类型提取报文（支持 TShark 识别的所有协议）
-   - extract_stream: 提取特定网络流
-   - get_statistics: 获取统计信息
+`capinfos` 在 tshark 同目录推导。
+
+## 工具列表（5 个）
+
+| 工具 | 作用 |
+|---|---|
+| `get_pcap_overview` | 文件概览 + 协议层次分布（capinfos + io,phs，不加载单包）|
+| `list_conversations` | TCP 流 / UDP 会话（双向包/字节统计）|
+| `extract_packets` | 按协议 + 时间窗组合过滤提取报文 |
+| `extract_stream` | 按五元组提取单条 TCP 流 / UDP 会话（双向）|
+| `get_statistics` | 吞吐 / 重传率 / 丢包 / TCP 连接 / HTTP 延迟 |
+
+每个工具的 inputSchema / outputSchema 由 pydantic 模型自动生成，客户端能完整感知参数与返回结构。
 
 ## 协议支持
 
-TShark2MCP 通过 TShark 的原生协议过滤器支持广泛的协议类型，包括但不限于：
+通过 tshark 原生协议过滤器支持广泛的协议。`extract_packets` 的 `protocol` 参数经白名单（`security.PROTOCOL_ALLOWLIST`）校验，常用协议已内置：
 
-- **传输层**: TCP, UDP, SCTP
-- **网络层**: IPv4, IPv6, ICMP, ARP
-- **安全协议**: TLS/SSL, DTLS
-- **应用层**: MQTT, HTTP/HTTPS, FTP, SSH, DNS, DHCP, SMTP, Modbus, BACnet 等
+- 传输/网络：tcp、udp、ip、ipv6、arp、icmp、icmpv6、eth
+- 应用层：http、http2、dns、tls、ssl、ftp、ftps、mqtt、coap、ssh、telnet、smtp、pop、imap、ntp、dhcp、snmp、rtsp、sip、ldap、websocket ...
 
-extract_by_protocol 工具直接将协议名传递给 TShark，因此支持 TShark 识别的任何协议，无需代码修改即可支持新协议。
+新协议只需在 `PROTOCOL_ALLOWLIST` 添加一项即可，无需改其他代码。非法协议名会被拒绝（防止 display-filter 注入）。
+
+## 验证安装
+
+```bash
+python -m tshark_mcp          # 应启动并等待 stdio 输入（JSON-RPC）
+pytest                        # 跑全部测试（integration 需 tshark）
+```

@@ -1,51 +1,64 @@
-# TShark2MCP - AI 辅助报文分析的 MCP 协议工具
+# TShark2MCP
 
-基于 Wireshark 的 TShark 命令行工具，构建一个支持 Model Context Protocol (MCP) 的 AI 辅助报文分析服务器，让 AI 助手能够通过标准化的 MCP 协议调用报文提取工具，辅助用户快速定位和分析网络通信异常。
+AI-assisted pcap/pcapng analysis over the
+[Model Context Protocol](https://modelcontextprotocol.io). Wraps Wireshark's
+`tshark` / `capinfos` as 5 typed MCP tools so AI clients (Claude Desktop,
+Cursor, VS Code) can analyze network captures through a standardized interface.
 
-## 功能概述
+All processing is local — captures never leave the machine.
 
-提供6个核心报文分析工具，支持：
-- pcap 文件概览分析
-- 网络会话提取
-- 时间范围过滤
-- 协议类型过滤
-- 特定网络流分析
-- 统计指标计算
+## Tools
 
-## 环境要求
+Each tool exposes a full JSON Schema (auto-generated from typed parameters),
+so the AI client knows exactly what to pass and what comes back.
 
-- **Python 3.8+**
-- **Wireshark/TShark 4.0+**
+| Tool | Purpose |
+|---|---|
+| `get_pcap_overview` | File metadata + protocol hierarchy (`capinfos` + `io,phs` — loads no individual packet) |
+| `list_conversations` | TCP streams / UDP sessions with per-direction packet/byte counts |
+| `extract_packets` | Filter by protocol and/or capture-relative time window |
+| `extract_stream` | Deep-dive one TCP stream / UDP session by 5-tuple (matches both directions) |
+| `get_statistics` | Retransmission rate, throughput, duplicate ACKs, out-of-order, HTTP latency |
 
-## 安装步骤
+## Requirements
 
-### 1. 安装 Wireshark
+- **Python ≥ 3.10**
+- **Wireshark ≥ 4.0** (provides `tshark` and `capinfos`)
 
-**Windows:**
-- 下载并安装 [Wireshark](https://www.wireshark.org/download.html)
-- 确保 TShark 被添加到系统 PATH，或记录安装路径
-
-
-### 2. 安装 Python 依赖
+## Install
 
 ```bash
-pip install -r requirements.txt
+cd TShark2MCP
+python -m venv .venv
+.venv\Scripts\activate                 # Windows; `source .venv/bin/activate` on Unix
+pip install -e ".[dev]"
 ```
 
-## MCP 服务器配置
+`tshark` is found by cascading lookup:
+1. `TSHARK_PATH` env var (executable file **or** Wireshark install directory)
+2. Common Windows install dirs (`C:\Program Files\Wireshark`, ...)
+3. System `PATH`
 
-将以下配置添加到支持 MCP 协议的 AI 助手（如 Cursor、VS Code、Claude Desktop）中：
+## Run
+
+```bash
+python -m tshark_mcp                    # stdio transport (default)
+# or the console script the editable install registered:
+tshark-mcp
+```
+
+## Configure an MCP client
+
+Claude Desktop / Cursor (`claude_desktop_config.json` or equivalent). Point
+`command` at your project venv's python:
 
 ```json
 {
   "mcpServers": {
-    "tshark2mcp": {
-      "command": "python",
-      "args": [
-        "D:\\niusulong\\wireshark_mcp\\TShark2MCP\\main.py"
-      ],
+    "tshark": {
+      "command": "D:\\<path>\\TShark2MCP\\.venv\\Scripts\\python.exe",
+      "args": ["-m", "tshark_mcp"],
       "env": {
-        "PYTHONPATH": "D:\\niusulong\\wireshark_mcp\\TShark2MCP\\src",
         "TSHARK_PATH": "C:\\Program Files\\Wireshark\\tshark.exe"
       }
     }
@@ -53,41 +66,32 @@ pip install -r requirements.txt
 }
 ```
 
-### 配置说明
+`TSHARK_PATH` is optional if `tshark` is already on `PATH`.
 
-- **command**: 启动服务器的命令（python）
-- **args**: 服务器入口文件的绝对路径
-- **env**: 环境变量配置
-  - `PYTHONPATH`: 确保 Python 能找到项目模块
-  - `TSHARK_PATH`: TShark 可执行文件路径
-
-**重要**: 请根据实际安装路径修改 `args` 和 `TSHARK_PATH` 的值。
-
-### TShark 路径配置
-
-项目支持多种 TShark 路径配置方式，按优先级排序：
-
-1. **环境变量 TSHARK_PATH** (推荐)
-   ```bash
-   export TSHARK_PATH="C:\Program Files\Wireshark\tshark.exe"
-   ```
-
-2. **系统 PATH 中的 tshark**
-   - 确保 Wireshark 安装时添加到系统 PATH
-
-3. **自动检测** (备用)
-   - 项目会尝试在常见位置查找 TShark
-
-## 启动服务器
+## Test
 
 ```bash
-python main.py
+pytest                                  # all tests (integration ones need tshark)
+pytest -m "not integration"             # pure unit tests only (no tshark)
 ```
 
-## 贡献
+Integration tests use the sample `.pcap` / `.pcapng` files in the repository
+root.
 
-欢迎提交 Issue 和 Pull Request 来改进项目。
+## Architecture
 
-## 许可证
+```
+src/tshark_mcp/
+  server.py     MCPServer + register_all
+  config.py     tshark/capinfos path resolution
+  executor.py   async tshark/capinfos subprocess wrapper (non-blocking)
+  filters.py    display-filter construction (typed, injection-safe)
+  parsers.py    capinfos / io,phs / conv text parsing
+  security.py   protocol allowlist
+  models.py     pydantic request/response models  (= each tool's inputSchema)
+  tools/        overview, conversations, extract, statistics
+```
 
-[项目许可证]
+**Design**: tool logic is pure `async (executor, params) -> result`;
+`register_all` wires each onto `@mcp.tool()` with a shared `TSharkExecutor`
+closure, so tools stay unit-testable with a mock executor and no MCP server.
