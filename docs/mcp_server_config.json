@@ -1,12 +1,9 @@
 {
   "mcpServers": {
-    "tshark2mcp": {
-      "command": "python",
-      "args": [
-        "D:\\niusulong\\wireshark_mcp\\TShark2MCP\\main.py"
-      ],
+    "tshark": {
+      "command": "D:\\niusulong\\wireshark_mcp\\TShark2MCP\\.venv\\Scripts\\python.exe",
+      "args": ["-m", "tshark_mcp"],
       "env": {
-        "PYTHONPATH": "D:\\niusulong\\wireshark_mcp\\TShark2MCP\\src",
         "TSHARK_PATH": "C:\\Program Files\\Wireshark\\tshark.exe"
       }
     }

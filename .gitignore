@@ -75,7 +75,3 @@ Thumbs.db
 *.tmp
 *.temp
 *.log
-
-# 测试文件
-test_*.py
-*_test.py

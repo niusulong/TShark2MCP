@@ -1,0 +1,20 @@
+File name:           D:\niusulong\wireshark_mcp\123下载失败.pcap
+File type:           K12 text file
+File encapsulation:  Per packet
+Encapsulation in use by packets (# of pkts):
+                     Ethernet (50)
+File timestamp precision:  nanoseconds (9)
+Packet size limit:   file hdr: (not set)
+Number of packets:   50
+File size:           23 kB
+Data size:           6282 bytes
+Capture duration:    2.385000000 seconds
+Earliest packet time: 2000-01-02 02:17:15.833000000
+Latest packet time:   2000-01-02 02:17:18.218000000
+Data byte rate:      2633 bytes/s
+Data bit rate:       21 kbps
+Average packet size: 125.64 bytes
+Average packet rate: 20 packets/s
+SHA256:              1b7ad11a7efc09dddf01acb7fc3908cce835a34299b80d7b953b1c05ef3edbf4
+SHA1:                362ca30e721062542dc2a638602436c548dadf87
+Strict time order:   True
