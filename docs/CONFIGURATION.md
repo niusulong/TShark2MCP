@@ -3,7 +3,7 @@
 ## 环境要求
 
 - **Python ≥ 3.10**
-- **Wireshark ≥ 4.0** —— **可选**。仓库自带精简便携版（`vendor/wireshark/`，Windows，约 155 MB），默认即用。仅在需要覆盖自带版本、或脱离源码树运行时才另行安装 Wireshark。
+- **Wireshark ≥ 4.0** —— **可选**。仓库自带精简便携版（`vendor/wireshark/`，Windows，约 118 MB），默认即用。仅在需要覆盖自带版本、或脱离源码树运行时才另行安装 Wireshark。
 
 ## 安装
 
@@ -56,7 +56,7 @@ editable install 会注册 `tshark-mcp` 命令，并让 `tshark_mcp` 包可被 i
 
 `capinfos` 在 tshark 同目录推导。
 
-> 自带的 `vendor/wireshark/` 通过模块相对路径定位（`config.py` 向上查找 `vendor/wireshark/tshark.exe`），因此**仅 editable 安装（`pip install -e .`）或直接从源码树运行时生效**。普通 wheel 安装不含这 ~155 MB 二进制，会自动回退到系统 Wireshark。
+> 自带的 `vendor/wireshark/` 通过模块相对路径定位（`config.py` 向上查找 `vendor/wireshark/tshark.exe`），因此**仅 editable 安装（`pip install -e .`）或直接从源码树运行时生效**。普通 wheel 安装不含这 ~118 MB 二进制，会自动回退到系统 Wireshark。
 
 ## 工具列表（5 个）
 

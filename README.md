@@ -23,7 +23,7 @@ so the AI client knows exactly what to pass and what comes back.
 ## Requirements
 
 - **Python ≥ 3.10**
-- **Wireshark ≥ 4.0** — **optional**. A stripped portable build (~155 MB,
+- **Wireshark ≥ 4.0** — **optional**. A stripped portable build (~118 MB,
   Windows) is bundled under `vendor/wireshark/` and used by default. Install
   Wireshark only to override the bundled copy or to run outside this source tree.
 

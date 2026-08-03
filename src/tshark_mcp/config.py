@@ -13,7 +13,7 @@ capinfos is discovered alongside tshark (same directory) when possible.
 Note: the bundled ``vendor/wireshark/`` is resolved *relative to this module*.
 It is therefore only found when running from the source tree or an editable
 install (``pip install -e .``). A non-editable wheel install does not ship the
-~155 MB of binaries and will transparently fall back to a system Wireshark.
+~118 MB of binaries and will transparently fall back to a system Wireshark.
 """
 
 from __future__ import annotations
