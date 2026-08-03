@@ -2,10 +2,18 @@
 
 Resolution priority:
   1. ``TSHARK_PATH`` env var (executable file *or* Wireshark install directory)
-  2. Common Windows Wireshark install directories
-  3. System ``PATH`` (bare ``tshark`` / ``capinfos``)
+  2. **Bundled** portable Wireshark shipped under ``vendor/wireshark/`` next to
+     the package — the self-contained default for clone-and-run deployments
+     (works for editable / source-tree installs where ``vendor/`` is present)
+  3. Common Windows Wireshark install directories
+  4. System ``PATH`` (bare ``tshark`` / ``capinfos``)
 
 capinfos is discovered alongside tshark (same directory) when possible.
+
+Note: the bundled ``vendor/wireshark/`` is resolved *relative to this module*.
+It is therefore only found when running from the source tree or an editable
+install (``pip install -e .``). A non-editable wheel install does not ship the
+~155 MB of binaries and will transparently fall back to a system Wireshark.
 """
 
 from __future__ import annotations
@@ -50,6 +58,37 @@ def _find_in_dir(directory: str, name: str) -> str | None:
     return None
 
 
+def _find_bundled_dir() -> Path | None:
+    """Locate the bundled ``vendor/wireshark/`` directory relative to this file.
+
+    Walks a bounded set of ancestors of this module so the lookup tolerates
+    different source layouts (src-layout editable install → repo root is
+    ``parents[2]``). Returns ``None`` when no bundled tree is present (e.g. a
+    wheel install), so callers can fall back to a system Wireshark.
+    """
+    here = Path(__file__).resolve()
+    for parent in list(here.parents)[:4]:
+        candidate = parent / "vendor" / "wireshark"
+        if (candidate / "tshark.exe").is_file():
+            return candidate
+    return None
+
+
+def _resolve_bundled() -> tuple[str, str | None] | None:
+    """Return ``(tshark, capinfos)`` from the bundled ``vendor/wireshark/``.
+
+    Returns ``None`` when no usable bundled tree exists.
+    """
+    bundled_dir = _find_bundled_dir()
+    if bundled_dir is None:
+        return None
+    tshark = _find_in_dir(str(bundled_dir), "tshark")
+    if tshark and _looks_executable(tshark):
+        logger.info("tshark via bundled vendor/wireshark: %s", tshark)
+        return tshark, _find_in_dir(str(bundled_dir), "capinfos")
+    return None
+
+
 def resolve_tshark_paths() -> tuple[str, str | None]:
     """Resolve ``(tshark_path, capinfos_path)``.
 
@@ -71,19 +110,25 @@ def resolve_tshark_paths() -> tuple[str, str | None]:
             logger.info("tshark via TSHARK_PATH: %s", env_path)
             return env_path, _find_in_dir(str(env_p.parent), "capinfos")
 
-    # 2. Common Windows install dirs
+    # 2. Bundled portable Wireshark (vendor/wireshark/) — self-contained default
+    bundled = _resolve_bundled()
+    if bundled:
+        return bundled
+
+    # 3. Common Windows install dirs
     for directory in _WINDOWS_CANDIDATES:
         tshark = _find_in_dir(directory, "tshark")
         if tshark and _looks_executable(tshark):
             logger.info("tshark via install dir: %s", tshark)
             return tshark, _find_in_dir(directory, "capinfos")
 
-    # 3. System PATH
+    # 4. System PATH
     if shutil.which("tshark"):
         logger.info("tshark via PATH")
         return "tshark", (shutil.which("capinfos") or None)
 
     raise RuntimeError(
-        "tshark not found. Set TSHARK_PATH, install Wireshark, "
-        "or add tshark to PATH."
+        "tshark not found. Options: (a) keep the bundled vendor/wireshark/ in "
+        "the source tree, (b) set TSHARK_PATH, (c) install Wireshark, or "
+        "(d) add tshark to PATH."
     )

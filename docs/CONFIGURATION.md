@@ -3,7 +3,7 @@
 ## 环境要求
 
 - **Python ≥ 3.10**
-- **Wireshark ≥ 4.0**（提供 `tshark` 和 `capinfos`）
+- **Wireshark ≥ 4.0** —— **可选**。仓库自带精简便携版（`vendor/wireshark/`，Windows，约 155 MB），默认即用。仅在需要覆盖自带版本、或脱离源码树运行时才另行安装 Wireshark。
 
 ## 安装
 
@@ -25,20 +25,23 @@ editable install 会注册 `tshark-mcp` 命令，并让 `tshark_mcp` 包可被 i
   "mcpServers": {
     "tshark": {
       "command": "D:\\<path>\\TShark2MCP\\.venv\\Scripts\\python.exe",
-      "args": ["-m", "tshark_mcp"],
-      "env": {
-        "TSHARK_PATH": "C:\\Program Files\\Wireshark\\tshark.exe"
-      }
+      "args": ["-m", "tshark_mcp"]
     }
   }
 }
+```
+
+自带 `vendor/wireshark/` 会自动被识别，**无需配置 `env`**。仅当要强制使用某个特定 tshark 时才设 `TSHARK_PATH`：
+
+```json
+      "env": { "TSHARK_PATH": "C:\\Program Files\\Wireshark\\tshark.exe" }
 ```
 
 ### 字段说明
 
 - `command`：项目 venv 的 python（editable install 后才能 `import tshark_mcp`）
 - `args`：`-m tshark_mcp` 启动 server；也可改用 console script `tshark-mcp`
-- `env.TSHARK_PATH`：可选。未设置时按优先级查找：`TSHARK_PATH` → 常见 Windows 安装目录 → 系统 PATH
+- `env.TSHARK_PATH`：可选。仅在要强制指定某个 tshark 时设置。默认会自动使用仓库自带的 `vendor/wireshark/`，无需任何 env。查找优先级见下节。
 
 > **不再需要 `PYTHONPATH`** —— 包已通过 `pip install -e .` 安装。
 
@@ -47,10 +50,13 @@ editable install 会注册 `tshark-mcp` 命令，并让 `tshark_mcp` 包可被 i
 `config.resolve_tshark_paths()` 级联查找：
 
 1. 环境变量 `TSHARK_PATH`（可指向 tshark 可执行文件，或 Wireshark 安装目录）
-2. 常见 Windows 路径（`C:\Program Files\Wireshark\`、`C:\Program Files (x86)\Wireshark\`）
-3. 系统 PATH（`tshark` / `capinfos`）
+2. **仓库自带** `vendor/wireshark/`（默认即用，无需安装 Wireshark；仅 editable / 源码树安装可用）
+3. 常见 Windows 路径（`C:\Program Files\Wireshark\`、`C:\Program Files (x86)\Wireshark\`）
+4. 系统 PATH（`tshark` / `capinfos`）
 
 `capinfos` 在 tshark 同目录推导。
+
+> 自带的 `vendor/wireshark/` 通过模块相对路径定位（`config.py` 向上查找 `vendor/wireshark/tshark.exe`），因此**仅 editable 安装（`pip install -e .`）或直接从源码树运行时生效**。普通 wheel 安装不含这 ~155 MB 二进制，会自动回退到系统 Wireshark。
 
 ## 工具列表（5 个）
 

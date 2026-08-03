@@ -23,7 +23,9 @@ so the AI client knows exactly what to pass and what comes back.
 ## Requirements
 
 - **Python ≥ 3.10**
-- **Wireshark ≥ 4.0** (provides `tshark` and `capinfos`)
+- **Wireshark ≥ 4.0** — **optional**. A stripped portable build (~155 MB,
+  Windows) is bundled under `vendor/wireshark/` and used by default. Install
+  Wireshark only to override the bundled copy or to run outside this source tree.
 
 ## Install
 
@@ -36,8 +38,12 @@ pip install -e ".[dev]"
 
 `tshark` is found by cascading lookup:
 1. `TSHARK_PATH` env var (executable file **or** Wireshark install directory)
-2. Common Windows install dirs (`C:\Program Files\Wireshark`, ...)
-3. System `PATH`
+2. **Bundled** `vendor/wireshark/` shipped with the repo (default — no install needed)
+3. Common Windows install dirs (`C:\Program Files\Wireshark`, ...)
+4. System `PATH`
+
+With `vendor/wireshark/` present you need **neither** Wireshark installed nor
+`TSHARK_PATH` set.
 
 ## Run
 
@@ -57,16 +63,18 @@ Claude Desktop / Cursor (`claude_desktop_config.json` or equivalent). Point
   "mcpServers": {
     "tshark": {
       "command": "D:\\<path>\\TShark2MCP\\.venv\\Scripts\\python.exe",
-      "args": ["-m", "tshark_mcp"],
-      "env": {
-        "TSHARK_PATH": "C:\\Program Files\\Wireshark\\tshark.exe"
-      }
+      "args": ["-m", "tshark_mcp"]
     }
   }
 }
 ```
 
-`TSHARK_PATH` is optional if `tshark` is already on `PATH`.
+The bundled `vendor/wireshark/` is used automatically — no `env` is needed.
+Set `env.TSHARK_PATH` only to force a specific `tshark`:
+
+```json
+      "env": { "TSHARK_PATH": "C:\\Program Files\\Wireshark\\tshark.exe" }
+```
 
 ## Test
 

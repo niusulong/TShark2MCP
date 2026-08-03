@@ -1,0 +1,409 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta http-equiv="X-UA-Compatible" content="IE=edge">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<meta name="generator" content="Asciidoctor 2.0.23">
+<title>Wireshark 4.6.0 Release Notes</title>
+<link rel="stylesheet" href="./ws.css">
+</head>
+<body class="article">
+<div id="header">
+<h1>Wireshark 4.6.0 Release Notes</h1>
+</div>
+<div id="content">
+<div id="preamble">
+<div class="sectionbody">
+<div class="paragraph">
+<p>This is the first release of the 4.6 branch.</p>
+</div>
+</div>
+</div>
+<div class="sect1">
+<h2 id="_what_is_wireshark">What is Wireshark?</h2>
+<div class="sectionbody">
+<div class="paragraph">
+<p>Wireshark is the world’s most popular network protocol analyzer.
+It is used for troubleshooting, analysis, development and education.</p>
+</div>
+<div class="paragraph">
+<p>Wireshark is hosted by the Wireshark Foundation, a nonprofit which promotes protocol analysis education.
+Wireshark and the foundation depend on your contributions in order to do their work.
+If you or your organization would like to contribute or become a sponsor, please visit <a href="https://wiresharkfoundation.org">wiresharkfoundation.org</a>.</p>
+</div>
+<div class="paragraph">
+<p>Official Wireshark training and certification are available from
+<a href="https://www.wireshark.org/certifications">the Wireshark Foundation</a>.</p>
+</div>
+</div>
+</div>
+<div class="sect1">
+<h2 id="_whats_new">What’s New</h2>
+<div class="sectionbody">
+<div class="paragraph">
+<p>Many other improvements have been made.
+See the “New and Updated Features” section below for more details.</p>
+</div>
+<div class="sect2">
+<h3 id="_new_and_updated_features">New and Updated Features</h3>
+<div class="paragraph">
+<p>The following features are new (or have been significantly updated) since version 4.6.0rc1:</p>
+</div>
+<div class="ulist">
+<ul>
+<li>
+<p>Wireshark can dissect process information, packet metadata, flow IDs, drop information, and other information provided by <code>tcpdump</code> on macOS.</p>
+</li>
+</ul>
+</div>
+<div class="paragraph">
+<p>The following features are either new or have been significantly updated since version 4.4.0:</p>
+</div>
+<div class="ulist">
+<ul>
+<li>
+<p>The Windows installers now ship with Npcap 1.83.
+They previously shipped with Npcap 1.79.</p>
+</li>
+<li>
+<p>The Windows and macOS installers now ship with Qt 6.9.3.
+They previously shipped with Qt 6.5.3.</p>
+</li>
+<li>
+<p>We now ship universal macOS installers instead of separate packages for Arm64 and Intel. <a href="https://gitlab.com/wireshark/wireshark/-/issues/17294">Issue 17294</a></p>
+</li>
+<li>
+<p>WinPcap is no longer supported. On Windows, use Npcap instead, uninstalling WinPcap if necessary.
+The final release of WinPcap was version 4.1.3 in 2013.
+It only supports up to Windows 8, which is no longer supported by Microsoft or Wireshark.</p>
+</li>
+<li>
+<p>A new “Plots” dialog has been added, which provides scatter plots in contrast to the “I/O Graphs” dialog, which provides histograms.
+The Plots dialog window supports multiple plots, markers, and automatic scrolling.</p>
+</li>
+<li>
+<p>Live captures can be compressed while writing. (Previously there was
+support for compressing when performing multiple file capture, at file
+rotation time.) The <code>--compress</code> option in TShark works on live captures
+as well. <a href="https://gitlab.com/wireshark/wireshark/-/issues/9311">Issue 9311</a></p>
+</li>
+<li>
+<p>Absolute time fields, regardless of field display in the Packet Details,
+are always written in ISO 8601 format in UTC with -T json. This was already
+the case for -T ek since version 4.2.0. JSON is primarily a data interchange
+format read by software, so a standard format is desirable.</p>
+</li>
+<li>
+<p>When absolute times field are output with -T fields, the "show" field of -T
+pdml, or in custom columns (including CSV output of columns), the formatting
+similar to asctime (e.g., Dec 18, 2017 05:28:39.071704055 EST) has been
+deprecated in favor of ISO 8601. For backwards compatibility, a preference
+has been added, protocols.display_abs_time_ascii, which can be set to continue
+to format times as before. This preference can also be set to never use ASCII
+time and to use ISO 8601 time formatting in the protocol tree (Packet Details)
+as well. It is possible that a future release will remove the ascitime style
+formatting entirely.</p>
+</li>
+<li>
+<p>UTC frame time column formats (including "Time (format as specified)" when
+a UTC time display format is selected) have a "Z" suffix per ISO 8601. Local
+time formats remain unqualified (including if the local time zone is UTC.)
+Custom columns displaying FT_ABSOLUTE_TIME already had time zone indication.</p>
+</li>
+<li>
+<p>The TShark <code>-G</code> option for generating glossary reports does not need to be the
+first option given on the command line anymore. In addition, the reports now
+are affected by other command line options such as <code>-o</code>, <code>-d</code>, and
+<code>--disable-protocol</code>, in addition to the <code>-C</code> option, which was already supported.
+(The <code>defaultprefs</code> report remains unaffected by any other options.)
+As a part of this change, <code>-G</code> with no argument, which was previously deprecated,
+is no longer supported. Use <code>tshark -G fields</code> to produce the same report.
+Also, the syntax for only listing fields with a certain prefix has changed to
+<code>tshark -G fields,prefix</code>.</p>
+</li>
+<li>
+<p>The underlying type of EUI-64 fields has been switched to bytes when packet
+matching, similar to most other address formats. This means that EUI-64
+addresses can be sliced and compared to other bytes types, e.g. the filter
+<code>wpan.src64[:3] == eth.src[:3]</code>. Fields can still be specified using 64-bit
+unsigned integer literals, though arithmetic with other integers is no longer
+supported.</p>
+</li>
+<li>
+<p>Wireshark can now decrypt NTP packets using NTS (Network Time Security). To decrypt packets,
+the NTS-KE (Network Time Security Key Establishment Protocol) packets need to be present,
+alongside the TLS client and exporter secrets. Additionally, the parts of a NTP packet which
+can be cryptographically authenticated (from NTP packet header until the end  of the last
+extension field that precedes the NTS Authenticator and Encrypted Extension Fields
+extension field) are checked for validity.</p>
+</li>
+<li>
+<p>Wireshark’s ability to decrypt MACsec packets has been expanded to either
+use the SAK unwrapped by the MKA dissector, or the PSK configured in the
+MACsec dissector. To enable the MKA dissector to unwrap the SAK, the CAK for
+the applicable CKN can be entered in the extended CKN/CAK Info UAT in the
+MKA dissector preferences. The ability of the MACsec dissector to decrypt
+packets using a PSK has been extended to a list of PSKs, which can entered
+through a new UAT.</p>
+</li>
+<li>
+<p>The TCP Stream Graph axes now use units with SI prefixes. <a href="https://gitlab.com/wireshark/wireshark/-/issues/20197">Issue 20197</a></p>
+</li>
+<li>
+<p>Custom columns have an option to show the values using the same format as
+in Packet Details.</p>
+</li>
+<li>
+<p>Custom column complex expressions (e.g., with arithmetic, filter functions,
+etc.) that return numeric results are sorted numerically instead of
+lexicographically.</p>
+</li>
+<li>
+<p>Display filter functions <code>float</code> and <code>double</code> are added to allow explicitly
+converting field types like integers and times to single and double precision
+floats. They can be used to perform further arithmetic operations on fields
+of different types, including in custom column definitions.</p>
+</li>
+<li>
+<p>The minimum width of the I/O Graph dialog window has been reduced, so it should
+work better on small resolution desktops, especially in certain languages.
+To enable this, some checkbox controls were moved to the graph right-click
+context menu. <a href="https://gitlab.com/wireshark/wireshark/-/issues/20147">Issue 20147</a></p>
+</li>
+<li>
+<p>X.509 certificates, used in TLS and elsewhere, can be exported via the
+<span class="menuseq"><b class="menu">File</b>&#160;<b class="caret">&#8250;</b> <b class="menuitem">Export Objects</b></span> menu in Wireshark (under the name "X509AF") and
+<code>--export-objects</code> in TShark (with the protocol name <code>x509af</code>.)</p>
+</li>
+<li>
+<p>Zstandard Content-Encoding is supported in the HTTP and HTTP/2 dissectors.</p>
+</li>
+<li>
+<p>Follow Stream is supported for MPEG 2 Transport Stream PIDs, and for
+Packetized Elementary Streams contained within MPEG 2 TS. The latter
+can be used to extract audio or video for playback with other tools.</p>
+</li>
+<li>
+<p>DNP 3 (Distributed Network Protocol 3) is now supported in the Conversations
+and Endpoints table dialogs.</p>
+</li>
+<li>
+<p>The Lua supplied preloaded libraries <code>bit</code> and <code>rex_pcre2</code> are loaded in
+a way that adds them to the <code>package.loaded</code> table, as though through
+<code>require</code>, so that <code>require("bit")</code> and <code>require("rex_pcre2")</code> statements
+in Lua dissectors, while usually superfluous, behave as expected. <a href="https://gitlab.com/wireshark/wireshark/-/issues/20213">Issue 20213</a></p>
+</li>
+<li>
+<p>The packet list (Wireshark) and event list (Stratoshark) no longer support rows with multiple lines.
+<a href="https://gitlab.com/wireshark/wireshark/-/issues/14424">Issue 14424</a></p>
+</li>
+<li>
+<p>The <em>ethers</em> file can also contain EUI-64 to name mappings. <a href="https://gitlab.com/wireshark/wireshark/-/issues/15487">Issue 15487</a></p>
+</li>
+<li>
+<p>Wireshark’s "Import from Hex Dump" feature and text2pcap now support byte groups with 2 to
+4 bytes (with an option for little-endian byte order), and support hexadecimal
+offsets with a <code>0x</code> or <code>0X</code> prefix (as produced by <code>tcpdump -x</code>, among others).
+<a href="https://gitlab.com/wireshark/wireshark/-/issues/16193">Issue 16193</a></p>
+</li>
+<li>
+<p>Frame timestamps can be added as preamble to hex dumps in Wireshark from
+the "Print" and "Export Packet Dissection" dialogs, and in TShark with
+the <code>--hexdump time</code> option. <a href="https://gitlab.com/wireshark/wireshark/-/issues/17132">Issue 17132</a></p>
+</li>
+<li>
+<p>Lua now has a <code>Conversation</code> object, which exposes conversations and conversation
+data to Lua. <a href="https://gitlab.com/wireshark/wireshark/-/issues/15396">Issue 15396</a></p>
+</li>
+<li>
+<p>An <span class="menuseq"><b class="menu">Edit</b>&#160;<b class="caret">&#8250;</b> <b class="submenu">Copy</b>&#160;<b class="caret">&#8250;</b> <b class="menuitem">as HTML</b></span> menu item has been added, along with associated context menu items and a keyboard
+shortcut. It provides an option (via knobs in preferences) to copy plain
+text with aligned columns along with an ability to select a copy format to be
+used when copied via keyboard shortcut.</p>
+</li>
+<li>
+<p>The "no duplicate keys" version of JSON output that tshark has supported
+since 2.6.0 is available through the GUI Export Dissections Dialog.
+Note that this format does not necessarily preserve the ordering of all
+children in a tree, if sibling with identical keys are not consecutive.</p>
+</li>
+<li>
+<p>The GUI Export Dissections Dialog can output raw hex bytes of the frame
+data for each field with or without exporting the field values, the same
+formats as the "-T json -x" and "-T jsonraw" output modes, respectively,
+of TShark.</p>
+</li>
+<li>
+<p>The Conversations and Endpoints dialogs have an option to display byte counts
+and bit rates in exact counts instead of human-readable numbers with SI units.
+The default setting when opening a dialog is controlled by a Statistics
+preference, "conv.machine_readable". The same preference controls whether
+precise byte counts are used in the TShark "-z conv" and "-z endpoints" taps.</p>
+</li>
+<li>
+<p>The output format for some TShark statistics taps (those selected with
+"-z &lt;tap&gt;,tree", which use the stats_tree system) can be controlled via
+a preference "-o statistics.output_format".</p>
+</li>
+<li>
+<p>The color scheme can be set to Light or Dark mode independently of the
+current OS default on Windows and macOS, if Wireshark is built with
+Qt 6.8 or later as the official installers are. <a href="https://gitlab.com/wireshark/wireshark/-/issues/19328">Issue 19328</a></p>
+</li>
+<li>
+<p>libxml2 is now a required dependency.
+Note that Wireshark will not build with libxml2 2.15.0, but other versions should work.</p>
+</li>
+<li>
+<p>The <b class="menuref">View</b> menu has an option to Redissect Packets manually, which can be useful
+when address resolution or decryption secrets have changed.</p>
+</li>
+<li>
+<p>HTTP2 tracking of 3GPP session over 5G Service Based Interfaces is now optional
+available. When enabled "Associate IMSI" will be add on HTTP2 streams which
+has been found belong to a session.</p>
+</li>
+<li>
+<p>Building the documentation on Windows no longer requires Java.</p>
+</li>
+<li>
+<p>On Linux, capture filters that use BPF extensions like "inbound", "outbound",
+and "ifindex" can be used for capturing (and compiled by the Compiled Filter
+dialog). Instead of always being rejected by the syntax checker, they will be
+marked as unknown.</p>
+</li>
+</ul>
+</div>
+</div>
+<div class="sect2">
+<h3 id="_removed_features_and_support">Removed Features and Support</h3>
+<div class="paragraph">
+<p>Wireshark no longer supports AirPcap and WinPcap.</p>
+</div>
+<div class="paragraph">
+<p>Wireshark no longer supports libnl versions 1 or 2.</p>
+</div>
+<div class="paragraph">
+<p>The <code>ENABLE_STATIC</code> CMake option has been deprecated in favor of <code>BUILD_SHARED_LIBS</code></p>
+</div>
+</div>
+<div class="sect2">
+<h3 id="_new_file_format_decoding_support">New File Format Decoding Support</h3>
+<div class="paragraph">
+<p>Resource Interchange File Format (RIFF) and TTL File Format</p>
+</div>
+</div>
+<div class="sect2">
+<h3 id="_new_protocol_support">New Protocol Support</h3>
+<div class="paragraph">
+<p>Asymmetric Key Packages (AKP), Binary HTTP, BIST TotalView-ITCH protocol (BIST-ITCH), BIST TotalView-OUCH protocol (BIST-OUCH), Bluetooth Android HCI (HCI ANDROID), Bluetooth Intel HCI (HCI INTEL), BPSec COSE Context, BPSec Default SC, Commsignia Capture Protocol (C2P), DECT NR+ (DECT-2020 New Radio), DLMS/COSEM, Ephemeral Diffie-Hellman Over COSE, Identifier-Locator Network Protocol (ILNP), LDA Neo Device trailer (LDA_NEO_TRAILER), Lenbrook Service Discovery Protocol (LSDP), LLC V1, Navitrol messaging, Network Time Security Key Establishment Protocol (NTS-KE), Ouster VLP-16, Private Line Emulation (PLE), RC V3, RCG, Roughtime, SBAS L5 Navigation Message, SGP.22 GSMA Remote SIM Provisioning (SGP.22), SGP.32 GSMA Remote SIM Provisioning (SGP.32), SICK CoLA Ascii and CoLA Binary protocols, Silabs Debug Channel, Universal Measurement and Calibration Protocol (XCP), USB Picture Transfer Protocol (USB-PTP), VLP-16 Data and Position messaging, and vSomeIP Internal Protocol (vSomeIP)</p>
+</div>
+</div>
+<div class="sect2">
+<h3 id="_updated_protocol_support">Updated Protocol Support</h3>
+<div class="paragraph">
+<p>Too many protocol updates have been made to list them all here.</p>
+</div>
+</div>
+</div>
+</div>
+<div class="sect1">
+<h2 id="_new_and_updated_capture_file_support">New and Updated Capture File Support</h2>
+<div class="sectionbody">
+<div class="paragraph">
+<p>BLF is now improved (including writing to BLF)</p>
+</div>
+<div class="sect2">
+<h3 id="_new_and_updated_capture_interfaces_support">New and Updated Capture Interfaces support</h3>
+<div class="ulist">
+<ul>
+<li>
+<p>On Windows, etwdump&#8217;s user-friendliness has been greatly improved
+thanks to various extcap changes. It should also now display the
+raw bytes of unknown events.</p>
+</li>
+</ul>
+</div>
+</div>
+<div class="sect2">
+<h3 id="_major_api_changes">Major API Changes</h3>
+<div class="paragraph">
+<p>The Lua API now supports Libgcrypt symmetric cipher functions.</p>
+</div>
+</div>
+</div>
+</div>
+<div class="sect1">
+<h2 id="_getting_wireshark">Getting Wireshark</h2>
+<div class="sectionbody">
+<div class="paragraph">
+<p>Wireshark source code and installation packages are available from
+<a href="https://www.wireshark.org/download.html" class="bare">https://www.wireshark.org/download.html</a>.</p>
+</div>
+<div class="sect2">
+<h3 id="_vendor_supplied_packages">Vendor-supplied Packages</h3>
+<div class="paragraph">
+<p>Most Linux and Unix vendors supply their own Wireshark packages.
+You can usually install or upgrade Wireshark using the package management system specific to that platform.
+A list of third-party packages can be found on the
+<a href="https://www.wireshark.org/download.html">download page</a>
+on the Wireshark web site.</p>
+</div>
+</div>
+</div>
+</div>
+<div class="sect1">
+<h2 id="_file_locations">File Locations</h2>
+<div class="sectionbody">
+<div class="paragraph">
+<p>Wireshark and TShark look in several different locations for preference files, plugins, SNMP MIBS, and RADIUS dictionaries.
+These locations vary from platform to platform.
+You can use <span class="menuseq"><b class="menu">Help</b>&#160;<b class="caret">&#8250;</b> <b class="submenu">About Wireshark</b>&#160;<b class="caret">&#8250;</b> <b class="menuitem">Folders</b></span> or <code>tshark -G folders</code> to find the default locations on your system.</p>
+</div>
+</div>
+</div>
+<div class="sect1">
+<h2 id="_getting_help">Getting Help</h2>
+<div class="sectionbody">
+<div class="paragraph">
+<p>The User’s Guide, manual pages and various other documentation can be found at
+<a href="https://www.wireshark.org/docs/" class="bare">https://www.wireshark.org/docs/</a></p>
+</div>
+<div class="paragraph">
+<p>Community support is available on
+<a href="https://ask.wireshark.org/">Wireshark’s Q&amp;A site</a>
+and on the wireshark-users mailing list.
+Subscription information and archives for all of Wireshark’s mailing lists can be found on <a href="https://lists.wireshark.org/lists/">the mailing list site</a>.</p>
+</div>
+<div class="paragraph">
+<p>Bugs and feature requests can be reported on
+<a href="https://gitlab.com/wireshark/wireshark/-/issues">the issue tracker</a>.</p>
+</div>
+<div class="paragraph">
+<p>You can learn protocol analysis and meet Wireshark’s developers at
+<a href="https://sharkfest.wireshark.org">SharkFest</a>.</p>
+</div>
+</div>
+</div>
+<div class="sect1">
+<h2 id="_how_you_can_help">How You Can Help</h2>
+<div class="sectionbody">
+<div class="paragraph">
+<p>The Wireshark Foundation helps as many people as possible understand their networks as much as possible.
+You can find out more and donate at <a href="https://wiresharkfoundation.org">wiresharkfoundation.org</a>.</p>
+</div>
+</div>
+</div>
+<div class="sect1">
+<h2 id="_frequently_asked_questions">Frequently Asked Questions</h2>
+<div class="sectionbody">
+<div class="paragraph">
+<p>A complete FAQ is available on the
+<a href="https://www.wireshark.org/faq.html">Wireshark web site</a>.</p>
+</div>
+</div>
+</div>
+</div>
+</body>
+</html>
