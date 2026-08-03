@@ -11,8 +11,8 @@ Only what `tshark` + `capinfos` need to read and dissect pcap/pcapng files:
 - `libwireshark.dll`, `libwiretap.dll`, `libwsutil.dll` — core libraries
 - All remaining runtime DLLs (TLS, Kerberos, Lua, glib, zstd, …)
 - `plugins/4.6/*.dll` — protocol dissectors
-- Dissection data dirs: `diameter/`, `radius/`, `snmp/`, `tls/`, `wimaxasncp/`,
-  `dtds/`, `protobuf/`, `tpncp/`, `generic/`
+- Dissection data dirs: `diameter/`, `radius/`, `tls/`, `wimaxasncp/`, `dtds/`,
+  `protobuf/`, `tpncp/`, `generic/`
 - `COPYING.txt`, `README.txt` — Wireshark's own license & attribution
 
 **Pruned** (not needed for CLI file analysis): `wireshark.exe` (GUI), all
@@ -26,7 +26,10 @@ media voice/FFmpeg codecs — `avcodec`/`avformat`/`avutil`/`swscale`/`swresampl
 `libbcg729`, plus the codec plugins under `plugins/4.6/codecs/` (`g722`, `g726`,
 `g729`, `ilbc`, `opus_dec`, `sbc`). These only *decode* RTP/media payloads,
 which the 5 MCP tools never do; protocol **dissection** is unaffected (verified
-against 4 pcaps incl. a 15 MB multi-protocol capture).
+against 4 pcaps incl. a 15 MB multi-protocol capture). Also pruned `snmp/`
+(MIB files, 18 MB): SNMP *name resolution* needs these, but the tools never
+enable name resolution (`-N`), so SNMP still dissects as raw OIDs — dissector
+registration verified intact via `tshark -G protocols`.
 
 Source: official **Wireshark 4.6.0** Windows build, unmodified binaries.
 
@@ -62,9 +65,10 @@ robocopy $src $dst /E /NFL /NDL /NJH `
        Wireshark.exe captype.exe dumpcap.exe editcap.exe mergecap.exe mmdbresolve.exe `
        randpkt.exe rawshark.exe reordercap.exe sharkd.exe text2pcap.exe uninstall-wireshark.exe `
   /XD platforms styles imageformats iconengines multimedia networkinformation `
-       translations extcap "Wireshark User's Guide" profiles codecs
+       translations extcap "Wireshark User's Guide" profiles codecs snmp
 ```
 
 The `/XD codecs` drops `plugins/4.6/codecs/` (the voice-codec dissectors that
-depend on the pruned codec DLLs). Resulting tree is ~135 MB. Validate with
-`tshark.exe --version` and a real pcap before committing.
+depend on the pruned codec DLLs); `/XD snmp` drops the MIB files. Resulting
+tree is ~118 MB. Validate with `tshark.exe --version` and a real pcap before
+committing.
