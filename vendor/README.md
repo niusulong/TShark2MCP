@@ -9,7 +9,7 @@ Only what `tshark` + `capinfos` need to read and dissect pcap/pcapng files:
 
 - `tshark.exe`, `capinfos.exe` — the two CLI tools this project calls
 - `libwireshark.dll`, `libwiretap.dll`, `libwsutil.dll` — core libraries
-- All remaining runtime DLLs (TLS, Kerberos, codecs, Lua, glib, zstd, …)
+- All remaining runtime DLLs (TLS, Kerberos, Lua, glib, zstd, …)
 - `plugins/4.6/*.dll` — protocol dissectors
 - Dissection data dirs: `diameter/`, `radius/`, `snmp/`, `tls/`, `wimaxasncp/`,
   `dtds/`, `protobuf/`, `tpncp/`, `generic/`
@@ -20,7 +20,13 @@ Only what `tshark` + `capinfos` need to read and dissect pcap/pcapng files:
 `iconengines/`, `multimedia/`, `networkinformation/`), `opengl32sw.dll`,
 `dxcompiler.dll`, `d3dcompiler_47.dll`, `WinSparkle.dll`, `translations/`,
 `Wireshark User's Guide/`, `extcap/`, and standalone tools not used here
-(`editcap`, `mergecap`, `rawshark`, `sharkd`, `dumpcap`, …).
+(`editcap`, `mergecap`, `rawshark`, `sharkd`, `dumpcap`, …). Also pruned:
+media voice/FFmpeg codecs — `avcodec`/`avformat`/`avutil`/`swscale`/`swresample`,
+`opus`, `libilbc`, `libspandsp`, `libspeexdsp`, `libsbc`, `libopencore-amrnb`,
+`libbcg729`, plus the codec plugins under `plugins/4.6/codecs/` (`g722`, `g726`,
+`g729`, `ilbc`, `opus_dec`, `sbc`). These only *decode* RTP/media payloads,
+which the 5 MCP tools never do; protocol **dissection** is unaffected (verified
+against 4 pcaps incl. a 15 MB multi-protocol capture).
 
 Source: official **Wireshark 4.6.0** Windows build, unmodified binaries.
 
@@ -51,11 +57,14 @@ $src = "C:\Program Files\Wireshark"
 $dst = "<repo>\TShark2MCP\vendor\wireshark"
 robocopy $src $dst /E /NFL /NDL /NJH `
   /XF Qt6*.dll opengl32sw.dll dxcompiler.dll dxil.dll d3dcompiler_47.dll WinSparkle.dll `
+       avcodec-61.dll avformat-61.dll avutil-59.dll swscale-8.dll swresample-5.dll `
+       opus.dll libilbc-2.dll libspandsp-2.dll libspeexdsp.dll libsbc-1.dll libopencore-amrnb-0.dll libbcg729.dll `
        Wireshark.exe captype.exe dumpcap.exe editcap.exe mergecap.exe mmdbresolve.exe `
        randpkt.exe rawshark.exe reordercap.exe sharkd.exe text2pcap.exe uninstall-wireshark.exe `
   /XD platforms styles imageformats iconengines multimedia networkinformation `
-       translations extcap "Wireshark User's Guide" profiles
+       translations extcap "Wireshark User's Guide" profiles codecs
 ```
 
-Resulting tree is ~155 MB. Validate with `tshark.exe --version` and a real pcap
-before committing.
+The `/XD codecs` drops `plugins/4.6/codecs/` (the voice-codec dissectors that
+depend on the pruned codec DLLs). Resulting tree is ~135 MB. Validate with
+`tshark.exe --version` and a real pcap before committing.
